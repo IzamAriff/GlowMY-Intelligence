@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -93,6 +93,8 @@ export default function Command() {
   const [content, setContent] = useState(null);
   const [skuId, setSkuId] = useState("serum");
   const [calc, setCalc] = useState({ cogs: 5.2, fee: 8, ads: 12, margin: 62, testPrice: 15 });
+  const abortRef = useRef(null);
+  const haltRef = useRef(false);
 
   useEffect(() => {
     try {
@@ -358,12 +360,20 @@ export default function Command() {
             {busy && (
               <span className="text-xs text-[#9560E8] animate-pulse">Consulting {busy}…</span>
             )}
+            {(busy || loading) && (
+              <button
+                onClick={stop}
+                className="px-4 py-2.5 rounded-2xl bg-white border border-red-300 text-red-700 text-xs font-semibold"
+              >
+                Stop
+              </button>
+            )}
             <button
               onClick={runAll}
-              disabled={loading}
+              disabled={loading || !!busy}
               className="px-4 py-2.5 rounded-2xl bg-[#3b2060] text-white text-xs font-semibold shadow-md disabled:opacity-60"
             >
-              {loading ? "Desk running…" : "Run all 6 agents"}
+              {loading ? "Desk running…" : "Refresh all agents"}
             </button>
           </div>
         </header>
@@ -468,7 +478,9 @@ export default function Command() {
               meta={trend?.generatedAt}
               source={trend?.source}
               onRun={() => run("trend")}
+              onStop={stop}
               busy={busy === "trend"}
+              hasData={!!trend}
             >
               {!trend ? (
                 <Empty onRun={() => run("trend")} />
@@ -551,7 +563,9 @@ export default function Command() {
               meta={price?.generatedAt}
               source={price?.source}
               onRun={() => run("price")}
+              onStop={stop}
               busy={busy === "price"}
+              hasData={!!price}
             >
               {!price || !sku || !stats ? (
                 <Empty onRun={() => run("price")} />
@@ -682,7 +696,7 @@ export default function Command() {
           )}
 
           {tab === "voc" && (
-            <Workspace agent="Mira" img="/icon-mira.jpg" title="What shoppers actually say" meta={voc?.generatedAt} source={voc?.source} onRun={() => run("voc")} busy={busy === "voc"}>
+            <Workspace agent="Mira" img="/icon-mira.jpg" title="What shoppers actually say" meta={voc?.generatedAt} source={voc?.source} onRun={() => run("voc")} onStop={stop} busy={busy === "voc"} hasData={!!voc}>
               {!voc ? (
                 <Empty onRun={() => run("voc")} />
               ) : (
@@ -739,7 +753,7 @@ export default function Command() {
           )}
 
           {tab === "health" && (
-            <Workspace agent="Kai" img="/icon-kai.jpg" title="Which SKUs deserve budget" meta={health?.generatedAt} source={health?.source} onRun={() => run("health")} busy={busy === "health"}>
+            <Workspace agent="Kai" img="/icon-kai.jpg" title="Which SKUs deserve budget" meta={health?.generatedAt} source={health?.source} onRun={() => run("health")} onStop={stop} busy={busy === "health"} hasData={!!health}>
               {!health ? (
                 <Empty onRun={() => run("health")} />
               ) : (
@@ -842,7 +856,7 @@ export default function Command() {
           )}
 
           {tab === "content" && (
-            <Workspace agent="Reza" img="/icon-reza.jpg" title="The week on camera" meta={content?.generatedAt} source={content?.source} onRun={() => run("content")} busy={busy === "content"}>
+            <Workspace agent="Reza" img="/icon-reza.jpg" title="The week on camera" meta={content?.generatedAt} source={content?.source} onRun={() => run("content")} onStop={stop} busy={busy === "content"} hasData={!!content}>
               {!content ? (
                 <Empty onRun={() => run("content")} />
               ) : (
@@ -906,7 +920,7 @@ export default function Command() {
   );
 }
 
-function Workspace({ agent, img, title, meta, source, onRun, busy, children }) {
+function Workspace({ agent, img, title, meta, source, onRun, onStop, busy, hasData, children }) {
   return (
     <section className="space-y-5">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-3">
@@ -920,13 +934,33 @@ function Workspace({ agent, img, title, meta, source, onRun, busy, children }) {
           </p>
           </div>
         </div>
-        <button
-          onClick={onRun}
-          disabled={busy}
-          className="px-5 py-3 rounded-2xl bg-[#9560E8] text-white text-sm font-semibold shadow-lg shadow-purple-200 disabled:opacity-60"
-        >
-          {busy ? "Agent running…" : "Run this agent"}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          {busy ? (
+            <button
+              onClick={onStop}
+              className="px-5 py-3 rounded-2xl bg-white border border-red-300 text-red-700 text-sm font-semibold"
+            >
+              Stop agent
+            </button>
+          ) : (
+            <>
+              <button
+                onClick={onRun}
+                className="px-5 py-3 rounded-2xl bg-[#9560E8] text-white text-sm font-semibold shadow-lg shadow-purple-200"
+              >
+                {hasData ? "Refresh agent" : "Run this agent"}
+              </button>
+              {hasData && (
+                <button
+                  onClick={onRun}
+                  className="px-4 py-3 rounded-2xl bg-white border border-[#FFC0CB] text-sm font-semibold"
+                >
+                  Re-run
+                </button>
+              )}
+            </>
+          )}
+        </div>
       </div>
       {children}
     </section>
